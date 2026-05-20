@@ -1,12 +1,14 @@
 import cv2
 import numpy as np
 import time
+import math
 from effects import VisualEffects
 
 class UIComponents:
     """
     Renders the gorgeous glassmorphic HUD, floating toolbar, cursor particle trails, 
     interactive color swatches, gesture sidebar guide, and visual action toast alerts.
+    Optimized to be fully responsive for arbitrary camera dimensions (e.g., 960x540).
     """
     def __init__(self):
         # Vibrant Neon/Futuristic BGR palette
@@ -19,7 +21,6 @@ class UIComponents:
             "ERASER": (0, 0, 0)         # Pitch Black (Eraser)
         }
         
-        self.header_height = 110
         self.button_rects = []
         
         # Instantiate built-in visual effects (trails, toasts)
@@ -56,12 +57,13 @@ class UIComponents:
 
     def draw_toolbar(self, img, active_name, hovered_name=None):
         """
-        Draws the floating glassmorphic toolbar at the top center.
+        Draws the floating glassmorphic toolbar at the top center. Fully responsive layout.
         """
         h, w, c = img.shape
         
-        tb_w = 1000
-        tb_h = 80
+        # Dynamic responsive layout math
+        tb_w = int(w * 0.88)
+        tb_h = 70
         tb_x1 = (w - tb_w) // 2
         tb_y1 = 15
         tb_x2 = tb_x1 + tb_w
@@ -101,25 +103,25 @@ class UIComponents:
             
             if name in ["RED", "GREEN", "BLUE", "YELLOW", "WHITE"]:
                 # Color Swatch Rendering
-                r = 18
+                r = 15
                 if is_active:
                     # Animated pulsating active ring
-                    pulse = int(2 + math.sin(time.time() * 8) * 2)
-                    cv2.circle(img, (cx, cy), r + 7 + pulse, color, 2, cv2.LINE_AA)
-                    cv2.circle(img, (cx, cy), r + 4, (255, 255, 255), 1, cv2.LINE_AA)
+                    pulse = int(1 + math.sin(time.time() * 8) * 2)
+                    cv2.circle(img, (cx, cy), r + 5 + pulse, color, 2, cv2.LINE_AA)
+                    cv2.circle(img, (cx, cy), r + 3, (255, 255, 255), 1, cv2.LINE_AA)
                 elif is_hovered:
-                    cv2.circle(img, (cx, cy), r + 7, (200, 200, 200), 1, cv2.LINE_AA)
+                    cv2.circle(img, (cx, cy), r + 5, (200, 200, 200), 1, cv2.LINE_AA)
                     
                 # Base circle
                 cv2.circle(img, (cx, cy), r, color, cv2.FILLED, cv2.LINE_AA)
-                cv2.circle(img, (cx, cy), r - 3, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.circle(img, (cx, cy), r - 2, (255, 255, 255), 1, cv2.LINE_AA)
                 
             else:
                 # Pill-shaped utility buttons
-                px1 = bx1 + 12
-                py1 = by1 + 22
-                px2 = bx2 - 12
-                py2 = by2 - 22
+                px1 = bx1 + 10
+                py1 = by1 + 18
+                px2 = bx2 - 10
+                py2 = by2 - 18
                 
                 pill_bg = (30, 30, 30)
                 pill_border = (100, 100, 100)
@@ -142,23 +144,24 @@ class UIComponents:
                 cv2.rectangle(img, (px1, py1), (px2, py2), pill_border, 1, cv2.LINE_AA)
                 
                 # Center-aligned text
-                text_size = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, 0.45, thick)[0]
+                text_size = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, 0.40, thick)[0]
                 tx = bx1 + (col_w - text_size[0]) // 2
                 ty = by1 + (tb_h + text_size[1]) // 2
-                cv2.putText(img, name, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.45, text_color, thick, cv2.LINE_AA)
+                cv2.putText(img, name, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.40, text_color, thick, cv2.LINE_AA)
                 
         return img
 
     def draw_sidebar_guide(self, img):
         """
         Draws a gorgeous, futuristic floating glass side panel explaining the gestures.
+        Responsive dimensions based on screen resolution.
         """
         h, w, c = img.shape
         
-        sb_w = 280
-        sb_h = 360
-        sb_x1 = 20
-        sb_y1 = (h - sb_h) // 2 - 20
+        sb_w = int(w * 0.26)
+        sb_h = int(h * 0.65)
+        sb_x1 = 15
+        sb_y1 = (h - sb_h) // 2 - 15
         sb_x2 = sb_x1 + sb_w
         sb_y2 = sb_y1 + sb_h
         
@@ -167,8 +170,8 @@ class UIComponents:
         
         # Title Header
         title = "GESTURE INTERFACE"
-        cv2.putText(img, title, (sb_x1 + 20, sb_y1 + 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.line(img, (sb_x1 + 20, sb_y1 + 45), (sb_x2 - 20, sb_y1 + 45), (100, 100, 100), 1, cv2.LINE_AA)
+        cv2.putText(img, title, (sb_x1 + 15, sb_y1 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.line(img, (sb_x1 + 15, sb_y1 + 40), (sb_x2 - 15, sb_y1 + 40), (100, 100, 100), 1, cv2.LINE_AA)
         
         # Gesture instructions
         guides = [
@@ -181,29 +184,30 @@ class UIComponents:
             ("🖖 REDO", "4 Fingers Up")
         ]
         
-        start_y = sb_y1 + 80
+        start_y = sb_y1 + 75
+        y_step = int(sb_h * 0.095)
         for i, (action, gesture) in enumerate(guides):
-            y_pos = start_y + i * 36
+            y_pos = start_y + i * y_step
             # Action name with neon theme coloring
-            cv2.putText(img, action, (sb_x1 + 20, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (80, 220, 255), 1, cv2.LINE_AA)
+            cv2.putText(img, action, (sb_x1 + 15, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (80, 220, 255), 1, cv2.LINE_AA)
             # Corresponding finger state description
-            cv2.putText(img, gesture, (sb_x1 + 130, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1, cv2.LINE_AA)
+            cv2.putText(img, gesture, (sb_x1 + sb_w - 95, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (180, 180, 180), 1, cv2.LINE_AA)
             
         # Draw a mini futuristic neon decor line on sidebar bottom
-        cv2.line(img, (sb_x1 + 20, sb_y2 - 15), (sb_x2 - 20, sb_y2 - 15), (80, 80, 80), 1, cv2.LINE_AA)
+        cv2.line(img, (sb_x1 + 15, sb_y2 - 15), (sb_x2 - 15, sb_y2 - 15), (80, 80, 80), 1, cv2.LINE_AA)
         
         return img
 
     def draw_status(self, img, gesture, current_color_name, brush_thickness, fps, latency=0.0):
         """
-        Draws the futuristic floating glassmorphism HUD indicator at the bottom center.
+        Draws the futuristic floating glassmorphism HUD indicator at the bottom center. Fully responsive.
         """
         h, w, c = img.shape
         
-        hud_w = 880
-        hud_h = 55
+        hud_w = int(w * 0.88)
+        hud_h = 50
         hud_x1 = (w - hud_w) // 2
-        hud_y1 = h - 75
+        hud_y1 = h - 65
         hud_x2 = hud_x1 + hud_w
         hud_y2 = hud_y1 + hud_h
         
@@ -229,20 +233,20 @@ class UIComponents:
             sx1 = hud_x1 + i * sec_w
             sx2 = hud_x1 + (i + 1) * sec_w
             
-            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 2)[0]
+            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.40, 2)[0]
             tx = sx1 + (sec_w - text_size[0]) // 2
             ty = hud_y1 + (hud_h + text_size[1]) // 2
             
-            cv2.putText(img, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.48, t_color, 2, cv2.LINE_AA)
+            cv2.putText(img, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.40, t_color, 2, cv2.LINE_AA)
             
             # Divider
             if i < 4:
-                cv2.line(img, (sx2, hud_y1 + 12), (sx2, hud_y2 - 12), (70, 70, 70), 1, cv2.LINE_AA)
+                cv2.line(img, (sx2, hud_y1 + 10), (sx2, hud_y2 - 10), (70, 70, 70), 1, cv2.LINE_AA)
                 
         # Draw side guide panel
         img = self.draw_sidebar_guide(img)
         
-        # Render visual toast notifications
+        # Render visual toast notifications (Fade Save, Undo, Redo notifications)
         img = self.effects.draw_toast(img)
         
         return img
@@ -263,10 +267,10 @@ class UIComponents:
             cv2.circle(img, (x, y), 2, (255, 255, 255), cv2.FILLED, cv2.LINE_AA)
             
             # Draw cursor selector ticks (North, South, East, West)
-            cv2.line(img, (x, y - 14), (x, y - 6), (255, 255, 255), 1, cv2.LINE_AA)
-            cv2.line(img, (x, y + 6), (x, y + 14), (255, 255, 255), 1, cv2.LINE_AA)
-            cv2.line(img, (x - 14, y), (x - 6, y), (255, 255, 255), 1, cv2.LINE_AA)
-            cv2.line(img, (x + 6, y), (x + 14, y), (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.line(img, (x, y - 12), (x, y - 5), (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.line(img, (x, y + 5), (x, y + 12), (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.line(img, (x - 12, y), (x - 5, y), (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.line(img, (x + 5, y), (x + 12, y), (255, 255, 255), 1, cv2.LINE_AA)
             
         elif gesture == "DRAW":
             # 2. Dynamic Brush Preview Circle showing actual brush circumference

@@ -76,8 +76,9 @@ class DrawingCanvas:
     Manages the virtual drawing board layer.
     Integrates Neon brush effects, StackHistoryManager for Undo/Redo,
     transparent exports, and stroke tracking for AI Shape Snapping.
+    Default size set to 960x540 to match camera optimization bounds.
     """
-    def __init__(self, width=1280, height=720):
+    def __init__(self, width=960, height=540):
         self.width = width
         self.height = height
         self.canvas = np.zeros((self.height, self.width, 3), np.uint8)
@@ -145,7 +146,6 @@ class DrawingCanvas:
                     elif shape_type == "CIRCLE":
                         center, radius = shape_info[1], shape_info[2]
                         # Draw circle using neon line segments or concentric rings
-                        # We can draw it using standard cv2 circle or Neon brush equivalents
                         if self.active_color == (0, 0, 0): # Eraser circle
                             cv2.circle(self.canvas, center, radius, self.active_color, self.active_thickness, cv2.LINE_AA)
                         else:

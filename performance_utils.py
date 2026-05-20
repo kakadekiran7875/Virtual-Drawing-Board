@@ -6,8 +6,9 @@ class ThreadedCamera:
     """
     Grabs frames from the camera asynchronously in a background thread to 
     eliminate blocking I/O overhead from cap.read() and ensure 30+ FPS.
+    Optimized for 960x540 capture.
     """
-    def __init__(self, src=0, width=1280, height=720):
+    def __init__(self, src=0, width=960, height=540):
         self.cap = cv2.VideoCapture(src)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)

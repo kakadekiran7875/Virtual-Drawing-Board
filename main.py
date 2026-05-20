@@ -10,12 +10,32 @@ from drawing_utils import DrawingCanvas, OneEuroFilter2D
 from ui_components import UIComponents
 from performance_utils import ThreadedCamera, PerformanceMonitor
 
+def optimize_lighting(img):
+    """
+    Applies real-time lighting optimization using CLAHE on the LAB luminance
+    channel to normalize exposure and boost hand visibility for AI tracking.
+    """
+    # Convert BGR to LAB color space
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Create and apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l)
+    
+    # Merge channels and convert back to BGR
+    limg = cv2.merge((cl, a, b))
+    enhanced = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+    return enhanced
+
+
 def main():
     # 1. Initialize folders
     os.makedirs("outputs", exist_ok=True)
     os.makedirs("screenshots", exist_ok=True)
     
-    width, height = 1280, 720
+    # Capture size optimized to 960x540 for hardware-level latency reduction
+    width, height = 960, 540
     
     # 2. Threaded Video Capture (runs camera I/O on background thread to prevent lag)
     cap = ThreadedCamera(src=0, width=width, height=height)
@@ -38,8 +58,13 @@ def main():
     filter_2d = OneEuroFilter2D(min_cutoff=1.0, beta=0.02)
     prev_gesture = "NONE"
     
-    print("🚀 Futuristic AI Virtual Drawing Board Started...")
-    print("Press 'q' or 'ESC' to quit, '+/-' to manually scale brush size.")
+    # 5. Fullscreen window configuration
+    window_name = "Virtual Drawing Board"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    
+    print("🚀 Premium AI Virtual Drawing Board Active (Fullscreen Mode)...")
+    print("Press 'q' or 'ESC' to exit.")
     
     try:
         while True:
@@ -52,6 +77,9 @@ def main():
                 continue
                 
             img = cv2.flip(img, 1) # Mirror naturally
+            
+            # Optimize lighting, balance exposure and improve hand visibility
+            img = optimize_lighting(img)
             
             # Find hands & draw skeleton overlays
             img = tracker.find_hands(img, draw=True)
@@ -113,13 +141,16 @@ def main():
                                 gesture_ctrl.force_cooldown("CLEAR")
                             elif name == "SAVE":
                                 timestamp = int(time.time())
+                                filename = f"drawing_{timestamp}.png"
+                                
                                 # Export transparent PNG
-                                canvas.export_transparent_png(f"outputs/drawing_{timestamp}.png")
+                                canvas.export_transparent_png(f"outputs/{filename}")
                                 # Merge camera frame with canvas and save standard screenshot
                                 merged = canvas.merge(img.copy())
                                 cv2.imwrite(f"screenshots/screenshot_{timestamp}.png", merged)
                                 
-                                ui.effects.show_toast("Drawing & Screenshot Saved!", "SAVE", (100, 255, 100))
+                                # Visual Toast alert with saved filename
+                                ui.effects.show_toast(f"Saved: {filename}", "SAVE", (100, 255, 100))
                                 gesture_ctrl.force_cooldown("SAVE")
                 
                 # --- B. DRAWING MODE (Index Up Only) ---
@@ -154,13 +185,16 @@ def main():
                 # --- F. SAVE GESTURE (Thumb Up) ---
                 elif gesture == "SAVE":
                     timestamp = int(time.time())
+                    filename = f"drawing_{timestamp}.png"
+                    
                     # Export transparent drawing
-                    canvas.export_transparent_png(f"outputs/drawing_{timestamp}.png")
+                    canvas.export_transparent_png(f"outputs/{filename}")
                     # Screenshot
                     merged = canvas.merge(img.copy())
                     cv2.imwrite(f"screenshots/screenshot_{timestamp}.png", merged)
                     
-                    ui.effects.show_toast("Saved to Outputs & Screenshots!", "SAVE", (100, 255, 100))
+                    # Visual Toast with exact filename
+                    ui.effects.show_toast(f"Saved: {filename}", "SAVE", (100, 255, 100))
                 
                 # --- G. PAUSE DRAWING (Fist) ---
                 elif gesture == "PAUSE":
@@ -182,8 +216,8 @@ def main():
                     # Compute distance
                     dist = math.hypot(cx_thumb - cx_index, cy_thumb - cy_index)
                     
-                    # Interpolate thickness (pinch width 20px to 180px -> brush width 2px to 50px)
-                    brush_thickness = int(np.interp(dist, [20, 180], [2, 50]))
+                    # Interpolate thickness (pinch width 20px to 140px -> brush width 2px to 50px)
+                    brush_thickness = int(np.interp(dist, [20, 140], [2, 50]))
                     
                     # Draw a gorgeous neon circular resize gauge at the pinch midpoint
                     mid_x = (cx_thumb + cx_index) // 2
@@ -215,7 +249,7 @@ def main():
             img = ui.draw_status(img, prev_gesture, current_color_name, brush_thickness, perf.get_fps(), perf.get_latency())
             
             # 9. Frame Display window
-            cv2.imshow("AI Futuristic Virtual Drawing Board", img)
+            cv2.imshow(window_name, img)
             
             # 10. Key events
             key = cv2.waitKey(1) & 0xFF
