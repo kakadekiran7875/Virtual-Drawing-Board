@@ -154,47 +154,50 @@ class UIComponents:
     def draw_sidebar_guide(self, img):
         """
         Draws a gorgeous, futuristic floating glass side panel explaining the gestures.
-        Responsive dimensions based on screen resolution.
+        Responsive, compact, and perfectly aligned with zero overlapping or encoding bugs.
         """
         h, w, c = img.shape
         
-        sb_w = int(w * 0.26)
-        sb_h = int(h * 0.65)
+        # Highly compact and non-intrusive side panel dimensions
+        sb_w = int(w * 0.22)
+        sb_h = int(h * 0.50)
         sb_x1 = 15
-        sb_y1 = (h - sb_h) // 2 - 15
+        sb_y1 = (h - sb_h) // 2 - 10
         sb_x2 = sb_x1 + sb_w
         sb_y2 = sb_y1 + sb_h
         
         # Transparent sidebar backer
         self._draw_blur_glass_card(img, sb_x1, sb_y1, sb_x2, sb_y2, bg_color=(12, 12, 12), alpha=0.65, border_color=(90, 90, 90), border_thickness=1)
         
-        # Title Header
-        title = "GESTURE INTERFACE"
-        cv2.putText(img, title, (sb_x1 + 15, sb_y1 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.line(img, (sb_x1 + 15, sb_y1 + 40), (sb_x2 - 15, sb_y1 + 40), (100, 100, 100), 1, cv2.LINE_AA)
+        # Title Header - Compact & Clean
+        title = "GESTURE GUIDE"
+        cv2.putText(img, title, (sb_x1 + 12, sb_y1 + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.line(img, (sb_x1 + 12, sb_y1 + 32), (sb_x2 - 12, sb_y1 + 32), (80, 80, 80), 1, cv2.LINE_AA)
         
-        # Gesture instructions
+        # Clean guide items with no emojis to prevent OpenCV unicode font character bugs
         guides = [
-            ("☝ DRAW", "1 Finger Up"),
-            ("✌ SELECT", "2 Fingers Up"),
-            ("🖐 CLEAR", "5 Fingers Up"),
-            ("✊ PAUSE", "Closed Fist"),
-            ("👍 SAVE", "Thumb Up"),
-            ("🤟 UNDO", "3 Fingers Up"),
-            ("🖖 REDO", "4 Fingers Up")
+            ("DRAW", "1 Finger Up"),
+            ("SELECT", "2 Fingers Up"),
+            ("CLEAR", "5 Fingers Up"),
+            ("PAUSE", "Closed Fist"),
+            ("SAVE", "Thumb Up"),
+            ("UNDO", "3 Fingers Up"),
+            ("REDO", "4 Fingers Up")
         ]
         
-        start_y = sb_y1 + 75
-        y_step = int(sb_h * 0.095)
+        start_y = sb_y1 + 58
+        y_step = int(sb_h * 0.12) # Evenly spaced
+        col2_x = sb_x1 + int(sb_w * 0.40) # Column 2 starting point
+        
         for i, (action, gesture) in enumerate(guides):
             y_pos = start_y + i * y_step
-            # Action name with neon theme coloring
-            cv2.putText(img, action, (sb_x1 + 15, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (80, 220, 255), 1, cv2.LINE_AA)
-            # Corresponding finger state description
-            cv2.putText(img, gesture, (sb_x1 + sb_w - 95, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (180, 180, 180), 1, cv2.LINE_AA)
+            # Action name with neon theme coloring (Column 1)
+            cv2.putText(img, action, (sb_x1 + 12, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (80, 220, 255), 1, cv2.LINE_AA)
+            # Corresponding finger state description (Column 2 - perfectly separated)
+            cv2.putText(img, gesture, (col2_x, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (180, 180, 180), 1, cv2.LINE_AA)
             
         # Draw a mini futuristic neon decor line on sidebar bottom
-        cv2.line(img, (sb_x1 + 15, sb_y2 - 15), (sb_x2 - 15, sb_y2 - 15), (80, 80, 80), 1, cv2.LINE_AA)
+        cv2.line(img, (sb_x1 + 12, sb_y2 - 12), (sb_x2 - 12, sb_y2 - 12), (70, 70, 70), 1, cv2.LINE_AA)
         
         return img
 
