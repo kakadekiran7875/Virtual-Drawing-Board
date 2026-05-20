@@ -1,15 +1,15 @@
 import cv2
 import numpy as np
 import math
+from history_manager import StackHistoryManager
+from effects import NeonGlowEffect, ShapeRecognizer
 
 class OneEuroFilter:
-    def __init__(self, t0, x0, dx0=0.0, min_cutoff=0.8, beta=0.03, d_cutoff=1.0):
-        """
-        Adaptive low-pass filter (1€ Filter).
-        - min_cutoff: Minimum cutoff frequency (Hz). Higher values reduce lag at low speeds.
-        - beta: Speed coefficient. Higher values reduce lag at high speeds.
-        - d_cutoff: Cutoff frequency for derivative smoothing.
-        """
+    """
+    Time-based adaptive low-pass filter (1€ Filter) to smooth cursor coordinates 
+    without adding visual latency.
+    """
+    def __init__(self, t0, x0, dx0=0.0, min_cutoff=1.0, beta=0.02, d_cutoff=1.0):
         self.min_cutoff = float(min_cutoff)
         self.beta = float(beta)
         self.d_cutoff = float(d_cutoff)
@@ -28,27 +28,28 @@ class OneEuroFilter:
         if dt <= 0:
             return self.x_prev
 
-        # Estimate derivative (speed) and filter it
+        # Estimate speed (derivative) and filter it
         dx = (x - self.x_prev) / dt
         edx_alpha = self._alpha(self.d_cutoff, dt)
         dx_hat = edx_alpha * dx + (1.0 - edx_alpha) * self.dx_prev
 
-        # Compute adaptive cutoff frequency
+        # Compute adaptive cutoff frequency based on speed
         cutoff = self.min_cutoff + self.beta * abs(dx_hat)
 
         # Filter the signal
         x_alpha = self._alpha(cutoff, dt)
         x_hat = x_alpha * x + (1.0 - x_alpha) * self.x_prev
 
-        # Save state
+        # Save states
         self.x_prev = x_hat
         self.dx_prev = dx_hat
         self.t_prev = t
 
         return x_hat
 
+
 class OneEuroFilter2D:
-    def __init__(self, min_cutoff=0.8, beta=0.03, d_cutoff=1.0):
+    def __init__(self, min_cutoff=1.0, beta=0.02, d_cutoff=1.0):
         self.x_filter = None
         self.y_filter = None
         self.min_cutoff = min_cutoff
@@ -69,52 +70,163 @@ class OneEuroFilter2D:
         self.x_filter = None
         self.y_filter = None
 
+
 class DrawingCanvas:
+    """
+    Manages the virtual drawing board layer.
+    Integrates Neon brush effects, StackHistoryManager for Undo/Redo,
+    transparent exports, and stroke tracking for AI Shape Snapping.
+    """
     def __init__(self, width=1280, height=720):
         self.width = width
         self.height = height
-        # Canvas initialized to pitch black
         self.canvas = np.zeros((self.height, self.width, 3), np.uint8)
         self.prev_x, self.prev_y = 0, 0
         
+        # Integrate stack-based history
+        self.history = StackHistoryManager(max_history=20)
+        
+        # Track coordinate points during a single draw stroke for shape recognition
+        self.current_stroke_points = []
+        self.active_color = (255, 255, 255)
+        self.active_thickness = 15
+
     def draw(self, x, y, color, thickness):
         """
-        Draws a line on the canvas from the previous coordinates to the current ones.
-        Smooths out the drawing experience.
+        Draws neon line segments between consecutive coordinates.
+        Captures the path for geometric shape snapping and triggers history saves.
         """
+        self.active_color = color
+        self.active_thickness = thickness
+
         if self.prev_x == 0 and self.prev_y == 0:
+            # Stroke just started! Save canvas state BEFORE any lines are drawn
+            self.history.save_state(self.canvas)
             self.prev_x, self.prev_y = x, y
-            
-        cv2.line(self.canvas, (self.prev_x, self.prev_y), (x, y), color, thickness)
+            self.current_stroke_points = []
+
+        # Record points for AI Shape Snapping
+        self.current_stroke_points.append((x, y))
+
+        # Perform high-performance neon line drawing
+        NeonGlowEffect.draw_neon_line(self.canvas, (self.prev_x, self.prev_y), (x, y), color, thickness)
+        
         self.prev_x, self.prev_y = x, y
-        
-    def reset_prev(self):
+
+    def reset_prev(self, enable_shape_snapping=True):
         """
-        Resets previous coordinates, stopping the line continuity.
-        Call this when the user pauses drawing or lifts their finger.
+        Resets continuous line tracking.
+        If shape snapping is active, analyzes the current stroke.
+        If a geometric shape is matched, it replaces the rough drawing with the perfect shape!
+        Returns:
+            str: Snapped shape category name (e.g., "CIRCLE", "RECTANGLE", "LINE") or None.
         """
+        snapped_shape_name = None
+
+        if enable_shape_snapping and self.current_stroke_points and len(self.current_stroke_points) >= 15:
+            # Analyze stroke with ShapeRecognizer
+            shape_info = ShapeRecognizer.recognize(self.current_stroke_points)
+            
+            if shape_info:
+                shape_type = shape_info[0]
+                
+                # Retrieve canvas state BEFORE the current rough scribble started
+                undo_canvas = self.history.undo(self.canvas)
+                if undo_canvas is not None:
+                    # Restore clean canvas
+                    self.canvas = undo_canvas
+                    
+                    # Draw perfect shape
+                    if shape_type == "LINE":
+                        pt1, pt2 = shape_info[1], shape_info[2]
+                        NeonGlowEffect.draw_neon_line(self.canvas, pt1, pt2, self.active_color, self.active_thickness)
+                        snapped_shape_name = "LINE"
+                    
+                    elif shape_type == "CIRCLE":
+                        center, radius = shape_info[1], shape_info[2]
+                        # Draw circle using neon line segments or concentric rings
+                        # We can draw it using standard cv2 circle or Neon brush equivalents
+                        if self.active_color == (0, 0, 0): # Eraser circle
+                            cv2.circle(self.canvas, center, radius, self.active_color, self.active_thickness, cv2.LINE_AA)
+                        else:
+                            # Neon brush circle: Outer glow, medium glow, core
+                            cv2.circle(self.canvas, center, radius, self.active_color, int(self.active_thickness * 2.2), cv2.LINE_AA)
+                            cv2.circle(self.canvas, center, radius, self.active_color, int(self.active_thickness * 1.5), cv2.LINE_AA)
+                            cv2.circle(self.canvas, center, radius, (255, 255, 255), max(2, int(self.active_thickness * 0.4)), cv2.LINE_AA)
+                        snapped_shape_name = "CIRCLE"
+                        
+                    elif shape_type == "RECTANGLE":
+                        pt1, pt2 = shape_info[1], shape_info[2]
+                        if self.active_color == (0, 0, 0): # Eraser rect
+                            cv2.rectangle(self.canvas, pt1, pt2, self.active_color, self.active_thickness, cv2.LINE_AA)
+                        else:
+                            # Neon brush rect
+                            cv2.rectangle(self.canvas, pt1, pt2, self.active_color, int(self.active_thickness * 2.2), cv2.LINE_AA)
+                            cv2.rectangle(self.canvas, pt1, pt2, self.active_color, int(self.active_thickness * 1.5), cv2.LINE_AA)
+                            cv2.rectangle(self.canvas, pt1, pt2, (255, 255, 255), max(2, int(self.active_thickness * 0.4)), cv2.LINE_AA)
+                        snapped_shape_name = "RECTANGLE"
+
+                    # Save the new perfect canvas state to the history stack
+                    self.history.save_state(self.canvas)
+
         self.prev_x, self.prev_y = 0, 0
-        
+        self.current_stroke_points = []
+        return snapped_shape_name
+
+    def undo(self):
+        """
+        Triggers an undo step.
+        """
+        undone_canvas = self.history.undo(self.canvas)
+        if undone_canvas is not None:
+            self.canvas = undone_canvas
+            return True
+        return False
+
+    def redo(self):
+        """
+        Triggers a redo step.
+        """
+        redone_canvas = self.history.redo(self.canvas)
+        if redone_canvas is not None:
+            self.canvas = redone_canvas
+            return True
+        return False
+
     def clear(self):
         """
-        Wipes the canvas clean.
+        Clears the canvas, saving state beforehand to support clear-undo.
         """
+        self.history.save_state(self.canvas)
         self.canvas = np.zeros((self.height, self.width, 3), np.uint8)
-        
-    def merge(self, frame):
+        self.prev_x, self.prev_y = 0, 0
+        self.current_stroke_points = []
+
+    def export_transparent_png(self, filepath):
         """
-        Merges the drawing canvas with the webcam feed.
+        Exports the canvas drawing as a transparent 4-channel BGRA PNG image.
         """
-        # Convert canvas to grayscale to create masks
+        # Convert BGR to Grayscale
         gray = cv2.cvtColor(self.canvas, cv2.COLOR_BGR2GRAY)
         
-        # Anything not black becomes white (mask for the drawing)
+        # Build transparency mask (non-black pixels are opaque)
+        _, alpha = cv2.threshold(gray, 5, 255, cv2.THRESH_BINARY)
+        
+        # Split channels and merge with Alpha mask
+        b, g, r = cv2.split(self.canvas)
+        bgra = cv2.merge([b, g, r, alpha])
+        
+        # Write to disk
+        return cv2.imwrite(filepath, bgra)
+
+    def merge(self, frame):
+        """
+        Alpha blends the drawing canvas with the live webcam feed.
+        """
+        gray = cv2.cvtColor(self.canvas, cv2.COLOR_BGR2GRAY)
         _, inv_mask = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY_INV)
         inv_mask = cv2.cvtColor(inv_mask, cv2.COLOR_GRAY2BGR)
         
-        # Black out the regions on the webcam frame where the drawing should go
         frame_bg = cv2.bitwise_and(frame, inv_mask)
-        
-        # Add the drawing canvas onto the frame
         frame = cv2.bitwise_or(frame_bg, self.canvas)
         return frame
