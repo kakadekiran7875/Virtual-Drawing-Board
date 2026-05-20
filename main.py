@@ -41,11 +41,23 @@ def main():
     cap = ThreadedCamera(src=0, width=width, height=height)
     cap.start()
     
+    # Wait for the first frame to determine actual camera hardware resolution
+    actual_width, actual_height = width, height
+    print("⏳ Warming up camera thread and detecting resolution...")
+    for _ in range(30):
+        success, img = cap.read()
+        if success and img is not None:
+            actual_height, actual_width, _ = img.shape
+            break
+        time.sleep(0.05)
+        
+    print(f"📷 Active Camera Resolution: {actual_width}x{actual_height}")
+    
     # 3. Core Modules
     tracker = HandTracker(max_hands=2, detection_con=0.80, track_con=0.80)
     gesture_ctrl = GestureController()
     ui = UIComponents()
-    canvas = DrawingCanvas(width, height)
+    canvas = DrawingCanvas(actual_width, actual_height)
     perf = PerformanceMonitor()
     
     # 4. State Variables

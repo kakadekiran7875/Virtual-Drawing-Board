@@ -222,7 +222,13 @@ class DrawingCanvas:
     def merge(self, frame):
         """
         Alpha blends the drawing canvas with the live webcam feed.
+        Defensively resizes the canvas if the camera frame dimensions differ.
         """
+        fh, fw = frame.shape[:2]
+        ch, cw = self.canvas.shape[:2]
+        if fh != ch or fw != cw:
+            self.canvas = cv2.resize(self.canvas, (fw, fh), interpolation=cv2.INTER_AREA)
+
         gray = cv2.cvtColor(self.canvas, cv2.COLOR_BGR2GRAY)
         _, inv_mask = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY_INV)
         inv_mask = cv2.cvtColor(inv_mask, cv2.COLOR_GRAY2BGR)
