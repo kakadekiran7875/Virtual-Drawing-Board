@@ -90,11 +90,11 @@ def main():
                 
             img = cv2.flip(img, 1) # Mirror naturally
             
-            # Optimize lighting, balance exposure and improve hand visibility
-            img = optimize_lighting(img)
+            # Optimize lighting on a copy of the frame to boost tracking accuracy in low-light environments
+            tracking_img = optimize_lighting(img)
             
-            # Find hands & draw skeleton overlays
-            img = tracker.find_hands(img, draw=True)
+            # Find hands & draw skeleton overlays on the original clean frame
+            img = tracker.find_hands(img, draw=True, tracking_img=tracking_img)
             hands_info = tracker.get_active_hands()
             
             hovered_button = None

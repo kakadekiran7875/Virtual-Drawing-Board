@@ -39,17 +39,20 @@ class HandTracker:
             (0, 17)
         ]
 
-    def find_hands(self, img, draw=True):
+    def find_hands(self, img, draw=True, tracking_img=None):
         """
         Processes flipped image to detect hands. Supports dynamic downscaling to 
         speed up internal landmark detection, mapping results back to native resolution.
         """
         h, w, c = img.shape
         
+        # If a pre-optimized tracking image is provided, use it for detection; otherwise use standard img
+        inference_img = tracking_img if tracking_img is not None else img
+        
         # Performance optimization: Resize frame to 640x360 internally for MediaPipe processing
         # This keeps the landmarks extremely responsive and stable
         scale_w, scale_h = 640, 360
-        img_small = cv2.resize(img, (scale_w, scale_h))
+        img_small = cv2.resize(inference_img, (scale_w, scale_h))
         img_rgb = cv2.cvtColor(img_small, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
         
